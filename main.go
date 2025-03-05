@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -28,6 +29,17 @@ type RedditClient struct {
 	accessToken string
 	httpClient  *http.Client
 	config      *Config
+}
+
+type DeleteOption struct {
+	Name        string
+	Description string
+}
+
+var deleteOptions = []DeleteOption{
+	{"all", "Delete both posts and comments"},
+	{"posts", "Delete only posts"},
+	{"comments", "Delete only comments"},
 }
 
 func loadConfig() (*Config, error) {
@@ -122,92 +134,166 @@ func (c *RedditClient) deleteContent(fullname string) error {
 	return nil
 }
 
-func deleteUserContent(client *RedditClient, cutoffDate time.Time) (int, error) {
+func promptChoice(prompt string, options []string) (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println(prompt)
+	for i, opt := range options {
+		fmt.Printf("%d. %s\n", i+1, opt)
+	}
+
+	fmt.Print("Enter your choice (1-" + fmt.Sprint(len(options)) + "): ")
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+
+	input = strings.TrimSpace(input)
+	choice := 0
+	_, err = fmt.Sscanf(input, "%d", &choice)
+	if err != nil || choice < 1 || choice > len(options) {
+		return "", fmt.Errorf("invalid choice")
+	}
+
+	return options[choice-1], nil
+}
+
+func promptDate(prompt string) (time.Time, error) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print(prompt + " (YYYY or YYYY-MM or YYYY-MM-DD): ")
+
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	input = strings.TrimSpace(input)
+
+	// Try different date formats
+	var t time.Time
+
+	switch len(strings.Split(input, "-")) {
+	case 1: // Year only (YYYY)
+		year := 0
+		if _, err := fmt.Sscanf(input, "%d", &year); err != nil {
+			return time.Time{}, fmt.Errorf("invalid year format: %v", err)
+		}
+		t = time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	case 2: // Year and month (YYYY-MM)
+		year, month := 0, 0
+		if _, err := fmt.Sscanf(input, "%d-%d", &year, &month); err != nil {
+			return time.Time{}, fmt.Errorf("invalid year-month format: %v", err)
+		}
+		if month < 1 || month > 12 {
+			return time.Time{}, fmt.Errorf("invalid month: must be between 1 and 12")
+		}
+		t = time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+
+	case 3: // Full date (YYYY-MM-DD)
+		var err error
+		t, err = time.Parse("2006-01-02", input)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("invalid date format: %v", err)
+		}
+
+	default:
+		return time.Time{}, fmt.Errorf("invalid date format. Use YYYY or YYYY-MM or YYYY-MM-DD")
+	}
+
+	return t, nil
+}
+
+func deleteUserContent(client *RedditClient, contentType string, cutoffDate time.Time) (int, error) {
 	deletedCount := 0
 
-	// Delete posts
-	postsOpts := reddit.ListUserOverviewOptions{
-		ListOptions: reddit.ListOptions{
-			Limit: 100,
-		},
-	}
-
-	for {
-		posts, resp, err := client.User.Posts(context.Background(), &postsOpts)
-		if err != nil {
-			return deletedCount, fmt.Errorf("failed to fetch posts: %v", err)
+	// Delete posts if requested
+	if contentType == "all" || contentType == "posts" {
+		postsOpts := reddit.ListUserOverviewOptions{
+			ListOptions: reddit.ListOptions{
+				Limit: 100,
+			},
 		}
 
-		if len(posts) == 0 {
-			break
-		}
-
-		for _, post := range posts {
-			postTime := time.Unix(post.Created.Unix(), 0)
-			fmt.Printf("Found post: %s (posted on %s)\n", post.Title, postTime.Format("2006-01-02"))
-
-			if postTime.Before(cutoffDate) {
-				fullname := fmt.Sprintf("t3_%s", post.ID)
-				fmt.Printf("Attempting to delete post: %s (Fullname: %s)\n", post.Title, fullname)
-
-				if err := client.deleteContent(fullname); err != nil {
-					fmt.Printf("Error deleting post %s: %v\n", fullname, err)
-					continue
-				}
-
-				fmt.Printf("Successfully deleted post: %s\n", post.Title)
-				deletedCount++
+		for {
+			posts, resp, err := client.User.Posts(context.Background(), &postsOpts)
+			if err != nil {
+				return deletedCount, fmt.Errorf("failed to fetch posts: %v", err)
 			}
-		}
 
-		if resp.After == "" {
-			break
-		}
-
-		postsOpts.After = resp.After
-		time.Sleep(2 * time.Second)
-	}
-
-	// Delete comments
-	commentsOpts := reddit.ListUserOverviewOptions{
-		ListOptions: reddit.ListOptions{
-			Limit: 100,
-		},
-	}
-
-	for {
-		comments, resp, err := client.User.Comments(context.Background(), &commentsOpts)
-		if err != nil {
-			return deletedCount, fmt.Errorf("failed to fetch comments: %v", err)
-		}
-
-		if len(comments) == 0 {
-			break
-		}
-
-		for _, comment := range comments {
-			commentTime := time.Unix(comment.Created.Unix(), 0)
-
-			if commentTime.Before(cutoffDate) {
-				fullname := fmt.Sprintf("t1_%s", comment.ID)
-				fmt.Printf("Attempting to delete comment from %s (Fullname: %s)\n", commentTime.Format("2006-01-02"), fullname)
-
-				if err := client.deleteContent(fullname); err != nil {
-					fmt.Printf("Error deleting comment %s: %v\n", fullname, err)
-					continue
-				}
-
-				fmt.Printf("Successfully deleted comment from %s\n", commentTime.Format("2006-01-02"))
-				deletedCount++
+			if len(posts) == 0 {
+				break
 			}
+
+			for _, post := range posts {
+				postTime := time.Unix(post.Created.Unix(), 0)
+				fmt.Printf("Found post: %s (posted on %s)\n", post.Title, postTime.Format("2006-01-02"))
+
+				if postTime.Before(cutoffDate) {
+					fullname := fmt.Sprintf("t3_%s", post.ID)
+					fmt.Printf("Attempting to delete post: %s (Fullname: %s)\n", post.Title, fullname)
+
+					if err := client.deleteContent(fullname); err != nil {
+						fmt.Printf("Error deleting post %s: %v\n", fullname, err)
+						continue
+					}
+
+					fmt.Printf("Successfully deleted post: %s\n", post.Title)
+					deletedCount++
+				}
+			}
+
+			if resp.After == "" {
+				break
+			}
+
+			postsOpts.After = resp.After
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	// Delete comments if requested
+	if contentType == "all" || contentType == "comments" {
+		commentsOpts := reddit.ListUserOverviewOptions{
+			ListOptions: reddit.ListOptions{
+				Limit: 100,
+			},
 		}
 
-		if resp.After == "" {
-			break
-		}
+		for {
+			comments, resp, err := client.User.Comments(context.Background(), &commentsOpts)
+			if err != nil {
+				return deletedCount, fmt.Errorf("failed to fetch comments: %v", err)
+			}
 
-		commentsOpts.After = resp.After
-		time.Sleep(2 * time.Second)
+			if len(comments) == 0 {
+				break
+			}
+
+			for _, comment := range comments {
+				commentTime := time.Unix(comment.Created.Unix(), 0)
+
+				if commentTime.Before(cutoffDate) {
+					fullname := fmt.Sprintf("t1_%s", comment.ID)
+					fmt.Printf("Attempting to delete comment from %s (Fullname: %s)\n", commentTime.Format("2006-01-02"), fullname)
+
+					if err := client.deleteContent(fullname); err != nil {
+						fmt.Printf("Error deleting comment %s: %v\n", fullname, err)
+						continue
+					}
+
+					fmt.Printf("Successfully deleted comment from %s\n", commentTime.Format("2006-01-02"))
+					deletedCount++
+				}
+			}
+
+			if resp.After == "" {
+				break
+			}
+
+			commentsOpts.After = resp.After
+			time.Sleep(2 * time.Second)
+		}
 	}
 
 	return deletedCount, nil
@@ -231,13 +317,26 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to authenticate: %v", err)
 	}
-	fmt.Printf("Authenticated as user: %s\n", user.Name)
+	fmt.Printf("Authenticated as user: %s\n\n", user.Name)
 
-	cutoffDate := time.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC)
-	deletedCount, err := deleteUserContent(client, cutoffDate)
+	// Prompt for content type
+	contentType, err := promptChoice("What would you like to delete?", []string{"all", "posts", "comments"})
+	if err != nil {
+		log.Fatalf("Failed to get content type choice: %v", err)
+	}
+
+	// Prompt for cutoff date
+	cutoffDate, err := promptDate("Enter the date before which to delete content")
+	if err != nil {
+		log.Fatalf("Failed to get cutoff date: %v", err)
+	}
+
+	fmt.Printf("\nDeleting %s before %s...\n\n", contentType, cutoffDate.Format("2006-01-02"))
+
+	deletedCount, err := deleteUserContent(client, contentType, cutoffDate)
 	if err != nil {
 		log.Fatalf("Error during deletion: %v", err)
 	}
 
-	fmt.Printf("Finished! Deleted %d items older than 2018\n", deletedCount)
+	fmt.Printf("\nFinished! Deleted %d items before %s\n", deletedCount, cutoffDate.Format("2006-01-02"))
 }
