@@ -215,8 +215,9 @@ func promptDate(prompt string, defaultDate time.Time) (time.Time, error) {
 	return t, nil
 }
 
-func deleteUserContent(client *RedditClient, contentType string, cutoffDate time.Time) (int, error) {
-	deletedCount := 0
+func deleteUserContent(client *RedditClient, contentType string, cutoffDate time.Time) (int, int, error) {
+	postsDeleted := 0
+	commentsDeleted := 0
 
 	// Delete posts if requested
 	if contentType == "all" || contentType == "posts" {
@@ -229,7 +230,7 @@ func deleteUserContent(client *RedditClient, contentType string, cutoffDate time
 		for {
 			posts, resp, err := client.User.Posts(context.Background(), &postsOpts)
 			if err != nil {
-				return deletedCount, fmt.Errorf("failed to fetch posts: %v", err)
+				return postsDeleted, commentsDeleted, fmt.Errorf("failed to fetch posts: %v", err)
 			}
 
 			if len(posts) == 0 {
@@ -250,7 +251,7 @@ func deleteUserContent(client *RedditClient, contentType string, cutoffDate time
 					}
 
 					fmt.Printf("Successfully deleted post: %s\n", post.Title)
-					deletedCount++
+					postsDeleted++
 				}
 			}
 
@@ -274,7 +275,7 @@ func deleteUserContent(client *RedditClient, contentType string, cutoffDate time
 		for {
 			comments, resp, err := client.User.Comments(context.Background(), &commentsOpts)
 			if err != nil {
-				return deletedCount, fmt.Errorf("failed to fetch comments: %v", err)
+				return postsDeleted, commentsDeleted, fmt.Errorf("failed to fetch comments: %v", err)
 			}
 
 			if len(comments) == 0 {
@@ -294,7 +295,7 @@ func deleteUserContent(client *RedditClient, contentType string, cutoffDate time
 					}
 
 					fmt.Printf("Successfully deleted comment from %s\n", commentTime.Format("2006-01-02"))
-					deletedCount++
+					commentsDeleted++
 				}
 			}
 
@@ -307,7 +308,7 @@ func deleteUserContent(client *RedditClient, contentType string, cutoffDate time
 		}
 	}
 
-	return deletedCount, nil
+	return postsDeleted, commentsDeleted, nil
 }
 
 func main() {
@@ -345,10 +346,13 @@ func main() {
 
 	fmt.Printf("\nDeleting %s before %s...\n\n", contentType, cutoffDate.Format("2006-01-02"))
 
-	deletedCount, err := deleteUserContent(client, contentType, cutoffDate)
+	postsDeleted, commentsDeleted, err := deleteUserContent(client, contentType, cutoffDate)
 	if err != nil {
 		log.Fatalf("Error during deletion: %v", err)
 	}
 
-	fmt.Printf("\nFinished! Deleted %d items before %s\n", deletedCount, cutoffDate.Format("2006-01-02"))
+	fmt.Printf("\nDeletion Summary:\n")
+	fmt.Printf("- Posts deleted: %d\n", postsDeleted)
+	fmt.Printf("- Comments deleted: %d\n", commentsDeleted)
+	fmt.Printf("Total items deleted: %d\n", postsDeleted+commentsDeleted)
 }
