@@ -134,21 +134,29 @@ func (c *RedditClient) deleteContent(fullname string) error {
 	return nil
 }
 
-func promptChoice(prompt string, options []string) (string, error) {
+func promptChoice(prompt string, options []string, defaultOption string) (string, error) {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println(prompt)
 	for i, opt := range options {
-		fmt.Printf("%d. %s\n", i+1, opt)
+		if opt == defaultOption {
+			fmt.Printf("%d. %s (default)\n", i+1, opt)
+		} else {
+			fmt.Printf("%d. %s\n", i+1, opt)
+		}
 	}
 
-	fmt.Print("Enter your choice (1-" + fmt.Sprint(len(options)) + "): ")
+	fmt.Printf("Enter your choice (1-%d) or press Enter for default: ", len(options))
 	input, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
 
 	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultOption, nil
+	}
+
 	choice := 0
 	_, err = fmt.Sscanf(input, "%d", &choice)
 	if err != nil || choice < 1 || choice > len(options) {
@@ -158,9 +166,9 @@ func promptChoice(prompt string, options []string) (string, error) {
 	return options[choice-1], nil
 }
 
-func promptDate(prompt string) (time.Time, error) {
+func promptDate(prompt string, defaultDate time.Time) (time.Time, error) {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print(prompt + " (YYYY or YYYY-MM or YYYY-MM-DD): ")
+	fmt.Printf("%s (YYYY or YYYY-MM or YYYY-MM-DD) [default: %s]: ", prompt, defaultDate.Format("2006"))
 
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -168,6 +176,9 @@ func promptDate(prompt string) (time.Time, error) {
 	}
 
 	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultDate, nil
+	}
 
 	// Try different date formats
 	var t time.Time
@@ -319,14 +330,15 @@ func main() {
 	}
 	fmt.Printf("Authenticated as user: %s\n\n", user.Name)
 
-	// Prompt for content type
-	contentType, err := promptChoice("What would you like to delete?", []string{"all", "posts", "comments"})
+	// Prompt for content type with default "all"
+	contentType, err := promptChoice("What would you like to delete?", []string{"all", "posts", "comments"}, "all")
 	if err != nil {
 		log.Fatalf("Failed to get content type choice: %v", err)
 	}
 
-	// Prompt for cutoff date
-	cutoffDate, err := promptDate("Enter the date before which to delete content")
+	// Prompt for cutoff date with default 2020
+	defaultDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	cutoffDate, err := promptDate("Enter the date before which to delete content", defaultDate)
 	if err != nil {
 		log.Fatalf("Failed to get cutoff date: %v", err)
 	}
