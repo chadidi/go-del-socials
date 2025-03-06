@@ -2,13 +2,13 @@
 
 This Go tool helps you automatically delete your old social media content. Currently supports:
 - Reddit posts and comments deletion
-- Twitter deletion (coming soon)
+- Twitter tweets and replies deletion
 
 ## Prerequisites
 
 - Go 1.23.6 or later
 - Reddit account and API credentials (for Reddit deletion)
-- Twitter API credentials (for Twitter deletion - coming soon)
+- Twitter API credentials (for Twitter deletion)
 
 ## Setup
 
@@ -36,9 +36,6 @@ This Go tool helps you automatically delete your old social media content. Curre
     "twitter": {
         "api_key": "YOUR_API_KEY",
         "api_key_secret": "YOUR_API_KEY_SECRET",
-        "access_token": "YOUR_ACCESS_TOKEN",
-        "access_token_secret": "YOUR_ACCESS_TOKEN_SECRET",
-        "bearer_token": "YOUR_BEARER_TOKEN",
         "username": "YOUR_TWITTER_USERNAME"
     }
 }
@@ -54,10 +51,15 @@ This Go tool helps you automatically delete your old social media content. Curre
 #### Twitter Configuration Fields
 - `api_key`: Your Twitter API key from the developer portal
 - `api_key_secret`: Your Twitter API key secret from the developer portal
-- `access_token`: Your Twitter access token from the developer portal
-- `access_token_secret`: Your Twitter access token secret from the developer portal
-- `bearer_token`: Your Twitter bearer token from the developer portal
 - `username`: Your Twitter username
+
+### Twitter Setup
+1. Create a Twitter Developer account and get API credentials:
+   - Go to https://developer.twitter.com/
+   - Sign up for a developer account if you haven't already
+   - Create a new project and app
+   - Get your API Key and Secret from the app settings
+   - Make sure you have read and write permissions for your app
 
 ## Usage
 
@@ -83,7 +85,13 @@ The script will:
 - Shows count of deleted posts and comments at the end
 
 ### Twitter
-- Coming soon!
+- Deletes both tweets and replies
+- Shows detailed progress including tweet content and dates
+- Includes a 2-second delay between API calls to avoid rate limiting
+- Verifies credentials and username before starting
+- Shows separate counts for deleted tweets and replies
+- Handles pagination to process all available tweets
+- Provides error logging for failed deletions
 
 ## Safety Features
 
