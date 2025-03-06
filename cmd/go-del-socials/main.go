@@ -49,14 +49,19 @@ func promptChoice(prompt string, options []string, defaultOption string) (string
 
 	fmt.Println(prompt)
 	for i, opt := range options {
-		if opt == defaultOption {
+		if defaultOption != "" && opt == defaultOption {
 			fmt.Printf("%d. %s (default)\n", i+1, opt)
 		} else {
 			fmt.Printf("%d. %s\n", i+1, opt)
 		}
 	}
 
-	fmt.Printf("Enter your choice (1-%d) or press Enter for default: ", len(options))
+	if defaultOption != "" {
+		fmt.Printf("Enter your choice (1-%d) or press Enter for default: ", len(options))
+	} else {
+		fmt.Printf("Enter your choice (1-%d): ", len(options))
+	}
+
 	input, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
@@ -64,7 +69,10 @@ func promptChoice(prompt string, options []string, defaultOption string) (string
 
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return defaultOption, nil
+		if defaultOption != "" {
+			return defaultOption, nil
+		}
+		return "", fmt.Errorf("a choice is required")
 	}
 
 	choice := 0
@@ -213,7 +221,7 @@ func main() {
 	}
 
 	// Choose platform
-	platform, err := promptChoice("Choose platform:", []string{"reddit", "twitter"}, "reddit")
+	platform, err := promptChoice("Choose platform:", []string{"reddit", "twitter"}, "")
 	if err != nil {
 		log.Fatalf("Failed to get platform choice: %v", err)
 	}
