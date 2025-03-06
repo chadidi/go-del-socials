@@ -232,6 +232,20 @@ func main() {
 	case "reddit":
 		runErr = runRedditDeletion(config)
 	case "twitter":
+		fmt.Println("\n⚠️  Important Notice about Twitter/X Deletion ⚠️")
+		fmt.Println("Twitter/X has significantly restricted their API access for free accounts.")
+		fmt.Println("As a result, this tool may no longer work reliably with Twitter.")
+		fmt.Println("\nRecommended Alternative:")
+		fmt.Printf("Please use DeleteTweets: %s\n", "https://github.com/Lyfhael/DeleteTweets")
+		fmt.Println("\nWould you like to:")
+		choice, err := promptChoice("", []string{"Continue anyway", "Exit"}, "Exit")
+		if err != nil {
+			log.Fatalf("Failed to get choice: %v", err)
+		}
+		if choice == "Exit" {
+			fmt.Println("Exiting. Please check out the recommended alternative tool.")
+			os.Exit(0)
+		}
 		runErr = runTwitterDeletion(config)
 	}
 
