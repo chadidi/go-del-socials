@@ -26,7 +26,6 @@ type Config struct {
 		APIKeySecret      string `json:"api_key_secret"`
 		AccessToken       string `json:"access_token"`
 		AccessTokenSecret string `json:"access_token_secret"`
-		BearerToken       string `json:"bearer_token"`
 		Username          string `json:"username"`
 	} `json:"twitter"`
 }
@@ -170,12 +169,7 @@ func runRedditDeletion(config *Config) error {
 
 func runTwitterDeletion(config *Config) error {
 	twitterConfig := &twitter.Config{
-		APIKey:            config.Twitter.APIKey,
-		APIKeySecret:      config.Twitter.APIKeySecret,
-		AccessToken:       config.Twitter.AccessToken,
-		AccessTokenSecret: config.Twitter.AccessTokenSecret,
-		BearerToken:       config.Twitter.BearerToken,
-		Username:          config.Twitter.Username,
+		Username: config.Twitter.Username,
 	}
 
 	client, err := twitter.NewClient(twitterConfig)
