@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"redditdelete/pkg/reddit"
-	"redditdelete/pkg/twitter"
+	"go-del-socials/pkg/reddit"
+	"go-del-socials/pkg/twitter"
 )
 
 type Config struct {
